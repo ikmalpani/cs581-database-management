@@ -1,0 +1,3 @@
+LOAD DATA LOCAL INFILE '~/dump_data.csv' INTO TABLE trip_details
+FIELDS TERMINATED by ','
+LINES TERMINATED BY '\n'
