@@ -2,15 +2,27 @@ from urllib.request import urlopen
 from random import randint
 import json
 import csv
+import random
+
+def compute_social_score(professions):
+    if any(professions.count(x) > 2 for x in professions):
+        return 0.6667
+    elif any(professions.count(x) > 1 for x in professions):
+        return 0.3333
+    else:
+        return 0
 
 def preprocess():
     slat = "40.6413"
     slong = "-73.7781"
     tuple_record = []
+    professionals = {1:['Student','Professor'],2:['Driver'],3:['Engineer'],4:['Doctor','Nurse'],5:['Social Worker'],
+                   6:['Cop','Lawyer','Journalist'],7:['Stylist','Model'],8:['Artist'],9:['Chef'],10:['Banker']}
     with open('final_input_data.csv', "rt", encoding="utf-8") as f:
         reader = csv.reader(f)
         next(reader, None)
         for row in reader:
+            passengercount = row[3].strip()
             dlat = row[8].strip()
             dlong = row[7].strip()
             url = "http://localhost:5000/route/v1/driving/" + slong + "," + slat + ";"
@@ -26,7 +38,11 @@ def preprocess():
             else:
                 wthreshold = 0
             dthreshold = 0.15 * trip_duration
-            tuple_record.append([row[0].strip(),row[1].strip(),row[2].strip(),row[3].strip(),slong,slat,dlong,dlat,row[4].strip(),trip_distance,trip_duration,dthreshold,willing_to_walk,wthreshold])
+            professions = []
+            for i in range(int(passengercount)):
+                professions.append(random.sample(professionals.keys(),1))
+            socialscore = compute_social_score(professions)
+            tuple_record.append([row[0].strip(),row[1].strip(),row[2].strip(),passengercount,slong,slat,dlong,dlat,row[4].strip(),trip_distance,trip_duration,dthreshold,willing_to_walk,wthreshold,socialscore])
 
     print(len(tuple_record))
 
