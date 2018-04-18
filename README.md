@@ -18,7 +18,7 @@ destinations. OSRM is used to find the trip distance and duration taken to reach
 This is the second script to be run on the cleaned data. This creates a dump csv file to load the database with the
 needed data. 
 
-4.Database - MySQL
+4. Database - MySQL
 tripdetails.sql - Creates the tripdetails table and needed indexes to hold data.
 dumpdata.sql - This script loads the table with data created from step 3. 
 These scripts are executed in the order mentioned below. 
