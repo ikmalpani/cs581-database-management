@@ -4,14 +4,6 @@ import json
 import csv
 import random
 
-def compute_social_score(professions):
-    if any(professions.count(x) > 2 for x in professions):
-        return 0.6667
-    elif any(professions.count(x) > 1 for x in professions):
-        return 0.3333
-    else:
-        return 0
-
 def preprocess():
     slat = "40.6413"
     slong = "-73.7781"
@@ -40,11 +32,9 @@ def preprocess():
             dthreshold = 0.15 * trip_duration
             professions = []
             for i in range(int(passengercount)):
-                professions.append(random.sample(professionals.keys(),1))
-            socialscore = compute_social_score(professions)
-            tuple_record.append([row[0].strip(),row[1].strip(),row[2].strip(),passengercount,slong,slat,dlong,dlat,row[4].strip(),trip_distance,trip_duration,dthreshold,willing_to_walk,wthreshold,socialscore])
-
-    print(len(tuple_record))
+                professions += random.sample(professionals.keys(),1)
+            profession = "-".join(str(x) for x in professions)
+            tuple_record.append([row[0].strip(),row[1].strip(),row[2].strip(),passengercount,slong,slat,dlong,dlat,row[4].strip(),trip_distance,trip_duration,dthreshold,willing_to_walk,wthreshold,profession])
 
     with open('dump_data.csv','w') as out:
         csv_out = csv.writer(out)

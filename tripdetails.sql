@@ -15,7 +15,7 @@ create table trip_details
   delay_threshold        float       null,
   willing_to_walk        int(1)      null,
   walking_threshold      float       null,
-  social_score           float       null,
+  profession            varchar(50)  null,
   constraint trip_details_trip_id_uindex
   unique (trip_id),
   constraint trip_id
