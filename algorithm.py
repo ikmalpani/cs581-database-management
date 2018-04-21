@@ -159,10 +159,12 @@ def main():
     parser.add_argument("-p",default=3,type=int,choices=[3,5,7],help="Pool window in minutes")
     parser.add_argument("-s",default=1,type=int,choices=[0,1],help="Include social scoring?")
     parser.add_argument("-w",default=5,type=int,choices=[1,2,3,4,5],help="Run for how many weeks?")
+    parser.add_argument("-o",required=True,help="Output File")
     args = parser.parse_args()
     pw = args.p
     ss = args.s
     weeks = args.w
+    outfile = args.o
     connection_object = dbconnect.open_db_connection()
     cursor = connection_object.cursor()
     cursor.execute("select * from trip_details order by pickup_datetime")
@@ -194,21 +196,23 @@ def main():
     avg_saved_distance = total_saved_distance/count
     avg_running_time = total_running_time/count
 
-    print("****** Pool window - {} minute - Statistics, Time Period - {} week ******".format(pw,weeks))
-    print("Merged Trips - {}".format(merged_trips))
-    print("Total Trips - {}".format(total_trips))
-    print("Total Lone Trips - {}".format(total_lone_trips))
-    print("Total Saved Trips - {}".format(total_saved_trips))
-    print("Total Original Distance - {} miles".format(total_trip_distance))
-    print("Total Distance Saved - {} miles".format(total_saved_distance))
-    print("Total run time to compute matches - {} minutes".format(total_running_time/60))
-    print("Average Trips - {}".format(avg_trips))
-    print("Average Lone Trips- {}".format(avg_lone_trips))
-    print("Average Saved Trips - {}".format(avg_saved_trips))
-    print("Average Original Distance in a pool window - {} miles".format(avg_original_distance))
-    print("Average Distance Saved - {} miles".format(avg_saved_distance))
-    print("Average Running Time - {} seconds".format(avg_running_time))
-    print("***************************************************************************")
+    with open(outfile,'w') as f:
+        print("****** Pool window - {} minute - Statistics, Time Period - {} week ******".format(pw,weeks),file = f)
+        print("Merged Trips - {}".format(merged_trips),file = f)
+        print("Total Trips - {}".format(total_trips),file = f)
+        print("Total Lone Trips - {}".format(total_lone_trips),file = f)
+        print("Total Saved Trips - {}".format(total_saved_trips),file = f)
+        print("Total Original Distance - {} miles".format(total_trip_distance),file = f)
+        print("Total Distance Saved - {} miles".format(total_saved_distance),file = f)
+        print("Total run time to compute matches - {} minutes".format(total_running_time/60), file = f)
+        print("Average Trips - {}".format(avg_trips), file = f)
+        print("Average Lone Trips- {}".format(avg_lone_trips),file = f)
+        print("Average Saved Trips - {}".format(avg_saved_trips), file = f)
+        print("Average Original Distance in a pool window - {} miles".format(avg_original_distance), file = f)
+        print("Average Distance Saved - {} miles".format(avg_saved_distance), file = f)
+        print("Average Running Time - {} seconds".format(avg_running_time), file = f)
+        print("***************************************************************************", file = f)
+    f.close()
 
 if __name__ == "__main__":
     main()
