@@ -1,8 +1,12 @@
 # CS581 Database Management Systems
 # Team 3 - Keshav Malpani, Prateek Shekhar Akhauri, Kruneet Patel, Maithreyi Rajagopalan
 This project evaluates ride-sharing algorithms on spatio-temporal data. 
-The data in this case represents nearly 10 million trips in New York City.
-A maximum of 4 passengers would be allowed per trip and a maximum of two trips will be combined.
+The raw data in this case represents nearly 10 million trips in New York City, which cuts down to 188.6 thousand after cleaning the dataset.
+A maximum of 4 passengers would be allowed per trip and a maximum of two trips will be combined. Only the static trips are considered. 
+
+The ojective of this project is to compare the merged trips with the individual trips to:
+1. determine the total distance or time saved by ridesharing 
+2. estimate the total number of trips saved
 
 Initial Data Set-up
 1. Data Clean-up
