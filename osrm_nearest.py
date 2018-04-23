@@ -40,13 +40,14 @@ def all_nearest_points(dropoff_latitude, dropoff_longitude, walking_threshold):
 	return new_field
 
 df = pd.read_csv('dump_data.csv', index_col = [0], header=None)
+
 new_col = []
 
 for index, row in df.iterrows():
 	dropoff_longitude, dropoff_latitude, walking_threshold = row[6], row[7], row[13]
 	final_points = all_nearest_points(dropoff_latitude, dropoff_longitude, walking_threshold)
 	new_col.append(final_points)
-	print(index)
+
 df[15] = new_col
 
 df.to_csv('dump_data_with_walking.csv', header=False)
