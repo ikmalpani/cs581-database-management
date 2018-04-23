@@ -5,6 +5,7 @@ import dbconnect
 from datetime import timedelta
 import timeit
 import argparse
+import haversine
 import tripdetails
 
 input_for_max_match = nx.Graph()
@@ -93,14 +94,24 @@ def max_matching(input_for_max_match):
     return matched
 
 def are_trips_mergeable(trip_1, trip_2,ss):
-    #if trip_1.willing_to_walk or trip_2.willing_to_walk:
-    #    print("Walking to be coded")
+    if trip_1.willing_to_walk or trip_2.willing_to_walk:
+        return are_trips_mergeable_walk(trip_2,trip_2,ss)
+    else:
+        return are_trips_mergeable_no_walk(trip_1, trip_2,ss)
+
+def are_trips_mergeable_walk(trip_1,trip_2,ss):
+    return True
+    #if trip_1.trip_duration <= trip_2.trip_duration and trip_1.willing_to_walk:
+    #   walkable(trip_1,trip_2)
+    #elif trip_2.trip_duration < trip_1.trip_duration and trip_2.willing_to_walk:
+    #    walkable(trip_2,trip_1)
     #else:
-    return are_trips_mergeable_no_walk(trip_1, trip_2,ss)
+    #   override++;
+    #    return are_trips_mergeable_no_walk(trip_1,trip_2,ss)
 
 
 def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
-    url = "http://localhost:5000/route/v1/driving/" + trip_1.dropoff_longitude + "," + trip_1.dropoff_lattitude + ";" + trip_2.dropoff_longitude + "," + trip_2.dropoff_lattitude
+    url = "http://localhost:5000/route/v1/driving/" + trip_1.dropoff_longitude + "," + trip_1.dropoff_latitude + ";" + trip_2.dropoff_longitude + "," + trip_2.dropoff_latitude
     response = urlopen(url)
     string = response.read().decode('utf-8')
     json_obj = json.loads(string)
@@ -147,6 +158,14 @@ def calculate_social_score(p1,p2):
     else:
         return 0
 
+def processballparks(points):
+    points = points.split('|')
+    ballparks = []
+    for p in points:
+        x,y = p.split('#')
+        ballparks.append((x,y))
+    return ballparks
+
 def check(d1, d2, duration_between, delay_threshold):
     increased_duration = ((d1 + duration_between) - d2) / d2
     if increased_duration <= delay_threshold:
@@ -158,20 +177,42 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p",default=3,type=int,choices=[3,5,7],help="Pool window in minutes")
     parser.add_argument("-s",default=1,type=int,choices=[0,1],help="Include social scoring?")
-    parser.add_argument("-w",default=5,type=int,choices=[1,2,3,4,5],help="Run for how many weeks?")
+    parser.add_argument("-walk",default=1,type=int,choices=[0,1],help="Include walking?")
+    parser.add_argument("-w",default=5,type=int,choices=[0,1,2,3,4,5],help="Run for how many weeks?")
+    parser.add_argument("-d",default=10,type=int,choices=range(1,32),help="Enter day for January!")
+    parser.add_argument("-h",default=8,type=int,choices=range(0,24),help="Enter begin hour")
     parser.add_argument("-o",required=True,help="Output File")
     args = parser.parse_args()
     pw = args.p
     ss = args.s
     weeks = args.w
+    if weeks == 0:
+        day = args.d
+        hour = args.h
+        if hour < 10:
+            beginhour = str(0) + str(hour)
+        else:
+            beginhour = str(hour)
+        begindate = '2016-01-' + day + ' ' + beginhour + ':00:00'
+        q = "select * from trip_details where pickup_datetime >= ('%s') order by pickup_datetime" % (begindate)
+
     outfile = args.o
     connection_object = dbconnect.open_db_connection()
     cursor = connection_object.cursor()
-    cursor.execute("select * from trip_details order by pickup_datetime")
+    if weeks > 0:
+        cursor.execute("select * from trip_details where pickup_datetime order by pickup_datetime")
+    else:
+        cursor.execute(q)
     first_record = cursor.fetchone()
-    startdate = first_record[1] #pickup_datetime
-    enddate = first_record[1] + timedelta(minutes=pw) #pool window - 3 minutes
-    stopdate = startdate + timedelta(weeks=weeks)
+    if weeks > 0:
+        startdate = first_record[1]  # pickup_datetime
+        enddate = first_record[1] + timedelta(minutes=pw)  # pool window - 3 minute
+        stopdate = startdate + timedelta(weeks=weeks)
+    else:
+        startdate = begindate  # pickup_datetime
+        enddate = begindate + timedelta(minutes=pw)  # pool window - 3 minute
+        stopdate = startdate + timedelta(hours=2)
+
     while (enddate <= stopdate):
         query = "select * from trip_details where pickup_datetime between ('%s') and ('%s')" % (startdate, enddate)
         cursor.execute(query)
@@ -181,7 +222,7 @@ def main():
             trips = []
             for record in cursor:
                 trip = tripdetails.TripDetails(record[0], record[1], record[3], record[6], record[7], record[9],
-                                                       record[10], record[11], record[12],record[13],record[14])
+                                                       record[10], record[11], record[12],record[13],record[14],processballparks(record[15]))
                 trips.append(trip)
             merge_trips(4,trips,ss)
 
