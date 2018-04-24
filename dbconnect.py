@@ -1,7 +1,6 @@
 import pymysql
 
-"""Function to open the database connection
-"""
+# Function to open the database connection
 def open_db_connection():
     host_name = 'localhost'
     port_number = 3306
@@ -12,8 +11,8 @@ def open_db_connection():
                                         user=user_name, passwd=password, db=database_name)
     return connection_object
 
-"""Function to close the database connection
-"""
+
+# Function to close the database connection
 def close_db_connection(connection_object):
     if connection_object is  not None:
         connection_object.commit()

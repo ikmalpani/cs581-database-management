@@ -16,9 +16,12 @@ total_saved_distance = 0
 total_running_time = 0
 count = 0
 merged_trips = []
+
+
 # ===============================================================================
 # Driver function to validate merging and invoke max match on the identified trips
 # ===============================================================================
+
 def merge_trips(passenger_constraint,trips,ss,walk):
     global total_saved_trips
     global total_lone_trips
@@ -84,6 +87,7 @@ def merge_trips(passenger_constraint,trips,ss,walk):
     total_saved_distance += pool_savings
     count += 1
 
+
 # ===============================================================================
 # Function to perform the max_matching algorithm by calling the networkx api
 # ===============================================================================
@@ -98,6 +102,7 @@ def are_trips_mergeable(trip_1, trip_2,ss,walk):
     else:
         return are_trips_mergeable_no_walk(trip_1, trip_2,ss)
 
+
 def are_trips_mergeable_walk(trip_1,trip_2,ss):
     if trip_1.trip_duration <= trip_2.trip_duration and trip_1.willing_to_walk and len(trip_1.ballparks)>0:
         new_dropoff_lat, new_dropoff_lon = find_best_dropoff(trip_1,trip_2)
@@ -110,6 +115,7 @@ def are_trips_mergeable_walk(trip_1,trip_2,ss):
         trip_2.dropoff_longitude = new_dropoff_lon
 
     return are_trips_mergeable_no_walk(trip_1,trip_2,ss)
+
 
 def find_best_dropoff(t1,t2):
     url = "http://localhost:5000/route/v1/driving/" + t1.dropoff_longitude + "," + t1.dropoff_latitude + ";" + t2.dropoff_longitude + "," + t2.dropoff_latitude
@@ -132,6 +138,7 @@ def find_best_dropoff(t1,t2):
                     best_lat = l1
                     best_lon = l2
     return best_lat,best_lon
+
 
 def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
     url = "http://localhost:5000/route/v1/driving/" + trip_1.dropoff_longitude + "," + trip_1.dropoff_latitude + ";" + trip_2.dropoff_longitude + "," + trip_2.dropoff_latitude
@@ -174,6 +181,7 @@ def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
 def calculate_distance_gain(d1,d2,distance_between):
     return float((d1 + distance_between) / (d1 + d2))
 
+
 def calculate_social_score(p1,p2):
     professions_1 = p1.split('-')
     professions_2 = p2.split('-')
@@ -187,6 +195,7 @@ def calculate_social_score(p1,p2):
     else:
         return 0
 
+
 def processballparks(points):
     ballparks = []
     if points != '0' and len(points) > 1:
@@ -196,12 +205,14 @@ def processballparks(points):
             ballparks.append((x,y))
     return ballparks
 
+
 def check(d1, d2, duration_between, delay_threshold):
     increased_duration = ((d1 + duration_between) - d2) / d2
     if increased_duration <= delay_threshold:
         return True
     else:
         return False
+
 
 def main():
     parser = argparse.ArgumentParser()

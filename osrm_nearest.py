@@ -39,8 +39,8 @@ def all_nearest_points(dropoff_latitude, dropoff_longitude, walking_threshold):
 	new_field = "|".join(str(i[0])+'#'+str(i[1]) for i in new_nearest_points)
 	return new_field
 
-df = pd.read_csv('dump_data.csv', index_col = [0], header=None)
 
+df = pd.read_csv('dump_data.csv', index_col = [0], header=None)
 new_col = []
 
 for index, row in df.iterrows():
@@ -52,5 +52,4 @@ for index, row in df.iterrows():
 		new_col.append(0)
 
 df[15] = new_col
-
 df.to_csv('dump_data_with_walking_d.csv', header=False)

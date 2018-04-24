@@ -1,5 +1,4 @@
-"""Class definition to store trip details.
-"""
+# Class definition to store trip details.
 
 class TripDetails:
     def __init__(self, trip_id,pickup_datetime,passenger_count,dropoff_longitude,dropoff_latitude,
@@ -16,13 +15,3 @@ class TripDetails:
         self.walking_threshold = walking_threshold
         self.professions = professions
         self.ballparks = ballparks
-
-
-
-
-
-
-
-
-
-
