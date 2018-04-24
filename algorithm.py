@@ -5,7 +5,7 @@ import dbconnect
 from datetime import timedelta
 import timeit
 import argparse
-import haversine
+from haversine import haversine
 import tripdetails
 
 input_for_max_match = nx.Graph()
@@ -20,7 +20,7 @@ merged_trips = []
 # ===============================================================================
 # Driver function to validate merging and invoke max match on the identified trips
 # ===============================================================================
-def merge_trips(passenger_constraint,trips,ss):
+def merge_trips(passenger_constraint,trips,ss,walk):
     global total_saved_trips
     global total_lone_trips
     global total_trips
@@ -52,7 +52,7 @@ def merge_trips(passenger_constraint,trips,ss):
             #Processing un-processed trips alone!
             if (trip_1.trip_id != trip_2.trip_id) and (trips_processed[i][j] == -1):
                 passenger_count = trip_1.passenger_count + trip_2.passenger_count
-                if passenger_count <= passenger_constraint and are_trips_mergeable(trip_1, trip_2,ss):
+                if passenger_count <= passenger_constraint and are_trips_mergeable(trip_1, trip_2,ss,walk):
                     trips_processed[i][j] = 1
                     trips_processed[j][i] = 1
                 else:
@@ -93,22 +93,36 @@ def max_matching(input_for_max_match):
     matched = nx.max_weight_matching(input_for_max_match, maxcardinality=True)
     return matched
 
-def are_trips_mergeable(trip_1, trip_2,ss):
-    if trip_1.willing_to_walk or trip_2.willing_to_walk:
-        return are_trips_mergeable_walk(trip_2,trip_2,ss)
+def are_trips_mergeable(trip_1, trip_2,ss,walk):
+    if (trip_1.willing_to_walk or trip_2.willing_to_walk) and walk:
+        return are_trips_mergeable_walk(trip_1,trip_2,ss)
     else:
         return are_trips_mergeable_no_walk(trip_1, trip_2,ss)
 
 def are_trips_mergeable_walk(trip_1,trip_2,ss):
-    return True
-    #if trip_1.trip_duration <= trip_2.trip_duration and trip_1.willing_to_walk:
-    #   walkable(trip_1,trip_2)
-    #elif trip_2.trip_duration < trip_1.trip_duration and trip_2.willing_to_walk:
-    #    walkable(trip_2,trip_1)
-    #else:
-    #   override++;
-    #    return are_trips_mergeable_no_walk(trip_1,trip_2,ss)
+    if trip_1.trip_duration <= trip_2.trip_duration and trip_1.willing_to_walk and len(trip_1.ballparks)>0:
+        new_dropoff_lat, new_dropoff_lon = find_best_dropoff(trip_1,trip_2)
+        trip_1.dropoff_latitude = new_dropoff_lat
+        trip_1.dropoff_longitude = new_dropoff_lon
 
+    if trip_2.trip_duration < trip_1.trip_duration and trip_2.willing_to_walk and len(trip_2.ballparks)>0:
+        new_dropoff_lat, new_dropoff_lon = find_best_dropoff(trip_2, trip_1)
+        trip_2.dropoff_latitude = new_dropoff_lat
+        trip_2.dropoff_longitude = new_dropoff_lon
+
+    return are_trips_mergeable_no_walk(trip_1,trip_2,ss)
+
+def find_best_dropoff(t1,t2):
+    min = None
+    best_lat = None
+    best_lon = None
+    for l1,l2 in t1.ballparks:
+            dist = haversine((l1,l2),(float(t2.dropoff_latitude),float(t2.dropoff_longitude)))
+            if min == None or dist < min:
+                best_lat = l1
+                best_lon = l2
+
+    return str(best_lat),str(best_lon)
 
 def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
     url = "http://localhost:5000/route/v1/driving/" + trip_1.dropoff_longitude + "," + trip_1.dropoff_latitude + ";" + trip_2.dropoff_longitude + "," + trip_2.dropoff_latitude
@@ -140,7 +154,10 @@ def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
                 sharing_gain = distance_gain
             input_for_max_match.add_nodes_from([trip_1,trip_2])
             input_for_max_match.add_edge(trip_1,trip_2,weight=sharing_gain,distance=distance_gain)
-    return result
+        return result
+    else:
+        return False
+
 
 def calculate_distance_gain(d1,d2,distance_between):
     return float((d1 + distance_between) / (d1 + d2))
@@ -159,11 +176,12 @@ def calculate_social_score(p1,p2):
         return 0
 
 def processballparks(points):
-    points = points.split('|')
     ballparks = []
-    for p in points:
-        x,y = p.split('#')
-        ballparks.append((x,y))
+    if points != '0' and len(points) > 1:
+        points = points.split('|')
+        for p in points:
+            x,y = p.split('#')
+            ballparks.append((float(x),float(y)))
     return ballparks
 
 def check(d1, d2, duration_between, delay_threshold):
@@ -180,37 +198,37 @@ def main():
     parser.add_argument("-walk",default=1,type=int,choices=[0,1],help="Include walking?")
     parser.add_argument("-w",default=5,type=int,choices=[0,1,2,3,4,5],help="Run for how many weeks?")
     parser.add_argument("-d",default=10,type=int,choices=range(1,32),help="Enter day for January!")
-    parser.add_argument("-h",default=8,type=int,choices=range(0,24),help="Enter begin hour")
+    parser.add_argument("-hr",default=8,type=int,choices=range(0,24),help="Enter begin hour")
     parser.add_argument("-o",required=True,help="Output File")
     args = parser.parse_args()
     pw = args.p
     ss = args.s
+    walk = args.walk
     weeks = args.w
-    if weeks == 0:
-        day = args.d
-        hour = args.h
-        if hour < 10:
-            beginhour = str(0) + str(hour)
-        else:
-            beginhour = str(hour)
-        begindate = '2016-01-' + day + ' ' + beginhour + ':00:00'
-        q = "select * from trip_details where pickup_datetime >= ('%s') order by pickup_datetime" % (begindate)
-
     outfile = args.o
     connection_object = dbconnect.open_db_connection()
     cursor = connection_object.cursor()
     if weeks > 0:
-        cursor.execute("select * from trip_details where pickup_datetime order by pickup_datetime")
+        q = "select * from trip_details where pickup_datetime order by pickup_datetime"
     else:
-        cursor.execute(q)
+        day = args.d
+        hour = args.hr
+        if hour < 10:
+            beginhour = str(0) + str(hour)
+        else:
+            beginhour = str(hour)
+        begindate = '2016-01-' + str(day) + ' ' + beginhour + ':00:00'
+        q = "select * from trip_details where pickup_datetime >= ('%s') order by pickup_datetime" % (begindate)
+
+    cursor.execute(q)
     first_record = cursor.fetchone()
     if weeks > 0:
         startdate = first_record[1]  # pickup_datetime
         enddate = first_record[1] + timedelta(minutes=pw)  # pool window - 3 minute
         stopdate = startdate + timedelta(weeks=weeks)
     else:
-        startdate = begindate  # pickup_datetime
-        enddate = begindate + timedelta(minutes=pw)  # pool window - 3 minute
+        startdate = first_record[1]  # pickup_datetime
+        enddate = startdate + timedelta(minutes=pw)  # pool window - 3 minute
         stopdate = startdate + timedelta(hours=2)
 
     while (enddate <= stopdate):
@@ -224,7 +242,7 @@ def main():
                 trip = tripdetails.TripDetails(record[0], record[1], record[3], record[6], record[7], record[9],
                                                        record[10], record[11], record[12],record[13],record[14],processballparks(record[15]))
                 trips.append(trip)
-            merge_trips(4,trips,ss)
+            merge_trips(4,trips,ss,walk)
 
             #poll database here, per pool window
             startdate = enddate + timedelta(seconds=1)
@@ -238,14 +256,20 @@ def main():
     avg_running_time = total_running_time/count
 
     with open(outfile,'w') as f:
-        print("****** Pool window - {} minute - Statistics, Time Period - {} week ******".format(pw,weeks),file = f)
+        if weeks > 0:
+            print("****** Pool window - {} minute - Statistics, Time Period - {} week ******".format(pw,weeks),file = f)
+        else:
+            print("****** Pool window - {} minute - Statistics, Time Period - 01/{}/2016, Hours Between {}:00:00 and {}:00:00 ******".format(pw, day, hour, hour + 2), file=f)
+
         print("Merged Trips - {}".format(merged_trips),file = f)
         print("Total Trips - {}".format(total_trips),file = f)
         print("Total Lone Trips - {}".format(total_lone_trips),file = f)
         print("Total Saved Trips - {}".format(total_saved_trips),file = f)
         print("Total Original Distance - {} miles".format(total_trip_distance),file = f)
         print("Total Distance Saved - {} miles".format(total_saved_distance),file = f)
-        print("Total run time to compute matches - {} minutes".format(total_running_time/60), file = f)
+        print("Percentage Savings - {}%".format(round((total_saved_distance / total_trip_distance) * 100), 0), file=f)
+        print("Total run time to compute matches - {} minutes".format(total_running_time / 60), file=f)
+        print("***************************************************************************", file=f)
         print("Average Trips - {}".format(avg_trips), file = f)
         print("Average Lone Trips- {}".format(avg_lone_trips),file = f)
         print("Average Saved Trips - {}".format(avg_saved_trips), file = f)

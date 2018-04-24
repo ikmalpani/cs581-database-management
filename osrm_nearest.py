@@ -18,7 +18,7 @@ def calculate_ball_parks(dropoff_latitude, dropoff_longitude, walking_threshold)
 
 
 def get_nearest_point(latitude, longitude, walking_threshold):
-	url = 'http://localhost:5000/nearest/v1/foot/' + str(longitude) + ',' + str(latitude) + '?number=1'
+	url = 'http://localhost:5000/nearest/v1/driving/' + str(longitude) + ',' + str(latitude) + '?number=1'
 	response = json.loads(urlopen(url).read().decode('utf-8'))
 	distance = response['waypoints'][0]['distance'] * 0.000621371
 	if distance <= (walking_threshold/2):
@@ -53,4 +53,4 @@ for index, row in df.iterrows():
 
 df[15] = new_col
 
-df.to_csv('dump_data_with_walking.csv', header=False)
+df.to_csv('dump_data_with_walking_d.csv', header=False)
