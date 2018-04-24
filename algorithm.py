@@ -5,7 +5,6 @@ import dbconnect
 from datetime import timedelta
 import timeit
 import argparse
-from haversine import haversine
 import tripdetails
 
 input_for_max_match = nx.Graph()
@@ -113,48 +112,61 @@ def are_trips_mergeable_walk(trip_1,trip_2,ss):
     return are_trips_mergeable_no_walk(trip_1,trip_2,ss)
 
 def find_best_dropoff(t1,t2):
-    min = None
-    best_lat = None
-    best_lon = None
-    for l1,l2 in t1.ballparks:
-            dist = haversine((l1,l2),(float(t2.dropoff_latitude),float(t2.dropoff_longitude)))
-            if min == None or dist < min:
-                best_lat = l1
-                best_lon = l2
-
-    return str(best_lat),str(best_lon)
-
-def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
-    url = "http://localhost:5000/route/v1/driving/" + trip_1.dropoff_longitude + "," + trip_1.dropoff_latitude + ";" + trip_2.dropoff_longitude + "," + trip_2.dropoff_latitude
+    url = "http://localhost:5000/route/v1/driving/" + t1.dropoff_longitude + "," + t1.dropoff_latitude + ";" + t2.dropoff_longitude + "," + t2.dropoff_latitude
     response = urlopen(url)
     string = response.read().decode('utf-8')
     json_obj = json.loads(string)
     if json_obj is not None:
-        duration_between_two_trips = json_obj['routes'][0]['duration']
-        distance_between_two_trips = json_obj['routes'][0]['distance'] * float(0.000621371)
-        if trip_1.trip_duration <= trip_2.trip_duration:
-            edge_one = trip_1.trip_duration
-            edge_two = trip_2.trip_duration
-            delay_threshold = trip_2.delay_threshold
-            distance_one = trip_1.trip_distance
-            distance_two = trip_2.trip_distance
-        else:
-            edge_one = trip_2.trip_duration
-            edge_two = trip_1.trip_duration
-            delay_threshold = trip_1.delay_threshold
-            distance_one = trip_2.trip_distance
-            distance_two = trip_1.trip_distance
-        result = check(edge_one, edge_two, duration_between_two_trips,delay_threshold)
-        if result:
-            distance_gain = calculate_distance_gain(distance_one,distance_two,distance_between_two_trips)
-            if ss:
-                social_score = calculate_social_score(trip_1.professions,trip_2.professions)
-                sharing_gain = (0.85 * distance_gain) + (0.15 * social_score)
+        min = json_obj['routes'][0]['distance'] * float(0.000621371)
+        best_lat = t1.dropoff_longitude
+        best_lon = t1.dropoff_longitude
+    for l1,l2 in t1.ballparks:
+        url = "http://localhost:5000/route/v1/driving/" + l2 + "," + l1 + ";" + t2.dropoff_longitude + "," + t2.dropoff_latitude
+        response = urlopen(url)
+        if response:
+            string = response.read().decode('utf-8')
+            json_obj = json.loads(string)
+            if json_obj is not None:
+                dist = json_obj['routes'][0]['distance'] * float(0.000621371)
+                if dist < min:
+                    best_lat = l1
+                    best_lon = l2
+    return best_lat,best_lon
+
+def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
+    url = "http://localhost:5000/route/v1/driving/" + trip_1.dropoff_longitude + "," + trip_1.dropoff_latitude + ";" + trip_2.dropoff_longitude + "," + trip_2.dropoff_latitude
+    response = urlopen(url)
+    if response:
+        string = response.read().decode('utf-8')
+        json_obj = json.loads(string)
+        if json_obj is not None:
+            duration_between_two_trips = json_obj['routes'][0]['duration']
+            distance_between_two_trips = json_obj['routes'][0]['distance'] * float(0.000621371)
+            if trip_1.trip_duration <= trip_2.trip_duration:
+                edge_one = trip_1.trip_duration
+                edge_two = trip_2.trip_duration
+                delay_threshold = trip_2.delay_threshold
+                distance_one = trip_1.trip_distance
+                distance_two = trip_2.trip_distance
             else:
-                sharing_gain = distance_gain
-            input_for_max_match.add_nodes_from([trip_1,trip_2])
-            input_for_max_match.add_edge(trip_1,trip_2,weight=sharing_gain,distance=distance_gain)
-        return result
+                edge_one = trip_2.trip_duration
+                edge_two = trip_1.trip_duration
+                delay_threshold = trip_1.delay_threshold
+                distance_one = trip_2.trip_distance
+                distance_two = trip_1.trip_distance
+            result = check(edge_one, edge_two, duration_between_two_trips,delay_threshold)
+            if result:
+                distance_gain = calculate_distance_gain(distance_one,distance_two,distance_between_two_trips)
+                if ss:
+                    social_score = calculate_social_score(trip_1.professions,trip_2.professions)
+                    sharing_gain = (0.85 * distance_gain) + (0.15 * social_score)
+                else:
+                    sharing_gain = distance_gain
+                input_for_max_match.add_nodes_from([trip_1,trip_2])
+                input_for_max_match.add_edge(trip_1,trip_2,weight=sharing_gain,distance=distance_gain)
+            return result
+        else:
+            return False
     else:
         return False
 
@@ -181,7 +193,7 @@ def processballparks(points):
         points = points.split('|')
         for p in points:
             x,y = p.split('#')
-            ballparks.append((float(x),float(y)))
+            ballparks.append((x,y))
     return ballparks
 
 def check(d1, d2, duration_between, delay_threshold):
