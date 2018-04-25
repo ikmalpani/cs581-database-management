@@ -29,4 +29,16 @@ These scripts are executed in the order mentioned below.
 
 Please ensure that all the data files are on the same directory containing the script.
 
+To use the 'algorithm.py' file, use the following parameters:
 
+> algorithm.py -walk 1 -w 0 -d 8 -hr 0 -hd 23 -o 5_1.txt
+
+> -walk 1 or 0 to control walking - default 1
+> -w 0 - 5 . 0 if you want hourly; 1 if u want for 1st week; 2 if you want first 2 weeks...
+> -s - 1 or 0 to control social score - default 1
+> -p 3 5 7 default 3
+> -d - if you choose hourly by giving week as 0, then 1 - 31 corresponding to the day.
+> -hr - begin hour (0-23)
+> -hd - delta hours (1-23). So you can give 0 1 for 12-1; 8 2 for 8-10 and 0 23 for the whole day.
+> -o output file to dump results
+You can use -h to see usage.
