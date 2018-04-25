@@ -118,32 +118,37 @@ def are_trips_mergeable_walk(trip_1,trip_2,ss):
 
 
 def find_best_dropoff(t1,t2):
-    url = "http://localhost:5000/route/v1/driving/" + t1.dropoff_longitude + "," + t1.dropoff_latitude + ";" + t2.dropoff_longitude + "," + t2.dropoff_latitude
-    response = urlopen(url)
-    string = response.read().decode('utf-8')
-    json_obj = json.loads(string)
-    if json_obj is not None:
-        min = json_obj['routes'][0]['distance'] * float(0.000621371)
-        best_lat = t1.dropoff_longitude
-        best_lon = t1.dropoff_longitude
-    for l1,l2 in t1.ballparks:
-        url = "http://localhost:5000/route/v1/driving/" + l2 + "," + l1 + ";" + t2.dropoff_longitude + "," + t2.dropoff_latitude
+    url = "http://localhost:5000/route/v1/driving/" + str(t1.dropoff_longitude) + "," + str(t1.dropoff_latitude) + ";" + str(t2.dropoff_longitude) + "," + str(t2.dropoff_latitude)
+    try:
         response = urlopen(url)
-        if response:
-            string = response.read().decode('utf-8')
-            json_obj = json.loads(string)
-            if json_obj is not None:
-                dist = json_obj['routes'][0]['distance'] * float(0.000621371)
-                if dist < min:
-                    best_lat = l1
-                    best_lon = l2
-    return best_lat,best_lon
+        string = response.read().decode('utf-8')
+        json_obj = json.loads(string)
+        if json_obj is not None:
+            min = json_obj['routes'][0]['distance'] * float(0.000621371)
+            best_lat = t1.dropoff_longitude
+            best_lon = t1.dropoff_longitude
+        for l1,l2 in t1.ballparks:
+            url = "http://localhost:5000/route/v1/driving/" + l2 + "," + l1 + ";" + str(t2.dropoff_longitude) + "," + str(t2.dropoff_latitude)
+            try:
+                response = urlopen(url)
+                string = response.read().decode('utf-8')
+                json_obj = json.loads(string)
+                if json_obj is not None:
+                    dist = json_obj['routes'][0]['distance'] * float(0.000621371)
+                    if dist < min:
+                        best_lat = l1
+                        best_lon = l2
+            except:
+                continue
+        return best_lat,best_lon
+    except:
+        return 0,0
 
 
 def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
-    url = "http://localhost:5000/route/v1/driving/" + trip_1.dropoff_longitude + "," + trip_1.dropoff_latitude + ";" + trip_2.dropoff_longitude + "," + trip_2.dropoff_latitude
-    response = urlopen(url)
-    if response:
+    url = "http://localhost:5000/route/v1/driving/" + str(trip_1.dropoff_longitude) + "," + str(trip_1.dropoff_latitude) + ";" + str(trip_2.dropoff_longitude) + "," + str(trip_2.dropoff_latitude)
+    try:
+        response = urlopen(url)
         string = response.read().decode('utf-8')
         json_obj = json.loads(string)
         if json_obj is not None:
@@ -174,13 +179,11 @@ def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
             return result
         else:
             return False
-    else:
+    except:
         return False
-
 
 def calculate_distance_gain(d1,d2,distance_between):
     return float((d1 + distance_between) / (d1 + d2))
-
 
 def calculate_social_score(p1,p2):
     professions_1 = p1.split('-')
@@ -222,6 +225,7 @@ def main():
     parser.add_argument("-w",default=5,type=int,choices=[0,1,2,3,4,5],help="Run for how many weeks?")
     parser.add_argument("-d",default=10,type=int,choices=range(1,32),help="Enter day for January!")
     parser.add_argument("-hr",default=8,type=int,choices=range(0,24),help="Enter begin hour")
+    parser.add_argument("-hd", default=1, type=int, choices=range(1,24), help="Enter hour delta")
     parser.add_argument("-o",required=True,help="Output File")
     args = parser.parse_args()
     pw = args.p
@@ -236,6 +240,7 @@ def main():
     else:
         day = args.d
         hour = args.hr
+        hd = args.hd
         if hour < 10:
             beginhour = str(0) + str(hour)
         else:
@@ -252,7 +257,7 @@ def main():
     else:
         startdate = first_record[1]  # pickup_datetime
         enddate = startdate + timedelta(minutes=pw)  # pool window - 3 minute
-        stopdate = startdate + timedelta(hours=2)
+        stopdate = startdate + timedelta(hours=hd)
 
     while (enddate <= stopdate):
         query = "select * from trip_details where pickup_datetime between ('%s') and ('%s')" % (startdate, enddate)
@@ -282,7 +287,7 @@ def main():
         if weeks > 0:
             print("****** Pool window - {} minute - Statistics, Time Period - {} week ******".format(pw,weeks),file = f)
         else:
-            print("****** Pool window - {} minute - Statistics, Time Period - 01/{}/2016, Hours Between {}:00:00 and {}:00:00 ******".format(pw, day, hour, hour + 2), file=f)
+            print("****** Pool window - {} minute - Statistics, Time Period - 01/{}/2016, Hours Between {}:00:00 and {}:00:00 ******".format(pw, day, hour, hour + hd), file=f)
 
         print("Merged Trips - {}".format(merged_trips),file = f)
         print("Total Trips - {}".format(total_trips),file = f)
