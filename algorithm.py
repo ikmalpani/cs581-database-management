@@ -81,7 +81,6 @@ def merge_trips(passenger_constraint,trips,ss,ssw,walk):
         ss = input_for_max_match[trip1][trip2]["ss"]
         od = trip1.trip_distance + trip2.trip_distance
         td = dg * od
-        print(td," ",trip1.trip_id,"-",trip2.trip_id)
         sd = od - td
         pool_savings += sd
         merged_trips.append((trip1.trip_id,trip2.trip_id))
