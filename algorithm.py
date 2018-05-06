@@ -14,6 +14,8 @@ total_saved_trips = 0
 total_trip_distance = 0
 total_saved_distance = 0
 total_running_time = 0
+total_dg = 0
+total_ss = 0
 count = 0
 merged_trips = []
 
@@ -22,7 +24,7 @@ merged_trips = []
 # Driver function to validate merging and invoke max match on the identified trips
 # ===============================================================================
 
-def merge_trips(passenger_constraint,trips,ss,walk):
+def merge_trips(passenger_constraint,trips,ss,ssw,walk):
     global total_saved_trips
     global total_lone_trips
     global total_trips
@@ -31,6 +33,8 @@ def merge_trips(passenger_constraint,trips,ss,walk):
     global total_running_time
     global count
     global merged_trips
+    global total_dg
+    global total_ss
     input_for_max_match.clear()
     no_of_trips = 0
     trip_distance = 0
@@ -54,7 +58,7 @@ def merge_trips(passenger_constraint,trips,ss,walk):
             #Processing un-processed trips alone!
             if (trip_1.trip_id != trip_2.trip_id) and (trips_processed[i][j] == -1):
                 passenger_count = trip_1.passenger_count + trip_2.passenger_count
-                if passenger_count <= passenger_constraint and are_trips_mergeable(trip_1, trip_2,ss,walk):
+                if passenger_count <= passenger_constraint and are_trips_mergeable(trip_1, trip_2,ss,ssw,walk):
                     trips_processed[i][j] = 1
                     trips_processed[j][i] = 1
                 else:
@@ -70,10 +74,14 @@ def merge_trips(passenger_constraint,trips,ss,walk):
     running_time = stop - start
     total_running_time += running_time
     pool_savings = 0
+    ss = 0
+    dg = 0
     for trip1,trip2 in matched:
         dg = input_for_max_match[trip1][trip2]["distance"]
+        ss = input_for_max_match[trip1][trip2]["ss"]
         od = trip1.trip_distance + trip2.trip_distance
         td = dg * od
+        print(td," ",trip1.trip_id,"-",trip2.trip_id)
         sd = od - td
         pool_savings += sd
         merged_trips.append((trip1.trip_id,trip2.trip_id))
@@ -85,6 +93,8 @@ def merge_trips(passenger_constraint,trips,ss,walk):
     total_lone_trips += lone_trips
     total_trip_distance += trip_distance
     total_saved_distance += pool_savings
+    total_dg += dg
+    total_ss += ss
     count += 1
 
 
@@ -96,14 +106,14 @@ def max_matching(input_for_max_match):
     matched = nx.max_weight_matching(input_for_max_match, maxcardinality=True)
     return matched
 
-def are_trips_mergeable(trip_1, trip_2,ss,walk):
+def are_trips_mergeable(trip_1, trip_2,ss,ssw,walk):
     if (trip_1.willing_to_walk or trip_2.willing_to_walk) and walk:
-        return are_trips_mergeable_walk(trip_1,trip_2,ss)
+        return are_trips_mergeable_walk(trip_1,trip_2,ss,ssw)
     else:
-        return are_trips_mergeable_no_walk(trip_1, trip_2,ss)
+        return are_trips_mergeable_no_walk(trip_1, trip_2,ss,ssw)
 
 
-def are_trips_mergeable_walk(trip_1,trip_2,ss):
+def are_trips_mergeable_walk(trip_1,trip_2,ss,ssw):
     if trip_1.trip_duration <= trip_2.trip_duration and trip_1.willing_to_walk and len(trip_1.ballparks)>0:
         new_dropoff_lat, new_dropoff_lon = find_best_dropoff(trip_1,trip_2)
         trip_1.dropoff_latitude = new_dropoff_lat
@@ -114,7 +124,7 @@ def are_trips_mergeable_walk(trip_1,trip_2,ss):
         trip_2.dropoff_latitude = new_dropoff_lat
         trip_2.dropoff_longitude = new_dropoff_lon
 
-    return are_trips_mergeable_no_walk(trip_1,trip_2,ss)
+    return are_trips_mergeable_no_walk(trip_1,trip_2,ss,ssw)
 
 
 def find_best_dropoff(t1,t2):
@@ -145,7 +155,7 @@ def find_best_dropoff(t1,t2):
         return 0,0
 
 
-def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
+def are_trips_mergeable_no_walk(trip_1, trip_2,ss,ssw):
     url = "http://localhost:5000/route/v1/driving/" + str(trip_1.dropoff_longitude) + "," + str(trip_1.dropoff_latitude) + ";" + str(trip_2.dropoff_longitude) + "," + str(trip_2.dropoff_latitude)
     try:
         response = urlopen(url)
@@ -171,11 +181,12 @@ def are_trips_mergeable_no_walk(trip_1, trip_2,ss):
                 distance_gain = calculate_distance_gain(distance_one,distance_two,distance_between_two_trips)
                 if ss:
                     social_score = calculate_social_score(trip_1.professions,trip_2.professions)
-                    sharing_gain = (0.85 * distance_gain) + (0.15 * social_score)
+                    sharing_gain = ((1-ssw) * distance_gain) + (ssw * social_score)
                 else:
                     sharing_gain = distance_gain
+                    social_score = 0
                 input_for_max_match.add_nodes_from([trip_1,trip_2])
-                input_for_max_match.add_edge(trip_1,trip_2,weight=sharing_gain,distance=distance_gain)
+                input_for_max_match.add_edge(trip_1,trip_2,weight=sharing_gain,distance=distance_gain,ss=social_score)
             return result
         else:
             return False
@@ -221,6 +232,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p",default=3,type=int,choices=[3,5,7],help="Pool window in minutes")
     parser.add_argument("-s",default=1,type=int,choices=[0,1],help="Include social scoring?")
+    parser.add_argument("-ss",default=0.15,type=float,help="Social scoring weight")
     parser.add_argument("-walk",default=1,type=int,choices=[0,1],help="Include walking?")
     parser.add_argument("-w",default=5,type=int,choices=[0,1,2,3,4,5],help="Run for how many weeks?")
     parser.add_argument("-d",default=10,type=int,choices=range(1,32),help="Enter day for January!")
@@ -230,6 +242,7 @@ def main():
     args = parser.parse_args()
     pw = args.p
     ss = args.s
+    ssw = args.ss
     walk = args.walk
     weeks = args.w
     outfile = args.o
@@ -270,7 +283,7 @@ def main():
                 trip = tripdetails.TripDetails(record[0], record[1], record[3], record[6], record[7], record[9],
                                                        record[10], record[11], record[12],record[13],record[14],processballparks(record[15]))
                 trips.append(trip)
-            merge_trips(4,trips,ss,walk)
+            merge_trips(4,trips,ss,ssw,walk)
 
             #poll database here, per pool window
             startdate = enddate + timedelta(seconds=1)
@@ -282,6 +295,8 @@ def main():
     avg_original_distance = total_trip_distance/count
     avg_saved_distance = total_saved_distance/count
     avg_running_time = total_running_time/count
+    avg_ss = total_ss/count
+    avg_dg = total_dg/count
 
     with open(outfile,'w') as f:
         if weeks > 0:
@@ -295,6 +310,8 @@ def main():
         print("Total Saved Trips - {}".format(total_saved_trips),file = f)
         print("Total Original Distance - {} miles".format(total_trip_distance),file = f)
         print("Total Distance Saved - {} miles".format(total_saved_distance),file = f)
+        print("Total Distance Gain - {} ".format(total_dg), file=f)
+        print("Total Social score - {} ".format(total_ss), file=f)
         print("Percentage Savings - {}%".format(round((total_saved_distance / total_trip_distance) * 100), 0), file=f)
         print("Total run time to compute matches - {} minutes".format(total_running_time / 60), file=f)
         print("***************************************************************************", file=f)
@@ -303,6 +320,8 @@ def main():
         print("Average Saved Trips - {}".format(avg_saved_trips), file = f)
         print("Average Original Distance in a pool window - {} miles".format(avg_original_distance), file = f)
         print("Average Distance Saved - {} miles".format(avg_saved_distance), file = f)
+        print("Average Distance Gain - {}".format(avg_dg), file=f)
+        print("Average Social Score - {} ".format(avg_ss), file=f)
         print("Average Running Time - {} seconds".format(avg_running_time), file = f)
         print("***************************************************************************", file = f)
     f.close()
